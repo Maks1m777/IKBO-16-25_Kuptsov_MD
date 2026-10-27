@@ -39,7 +39,6 @@ def _resolve_path(path: str, base: str = "/"):
         parts = path.split("/")
     else:
         parts = (base.rstrip("/") + "/" + path).split("/")
-
     out = []
     for p in parts:
         if p == "" or p == ".":
@@ -168,6 +167,7 @@ def vfs_to_lines(vfs: VFS):
             kids = sorted(node.children.values(), key=lambda n: (not n.is_dir, n.name))
             for ch in kids:
                 walk(ch, prefix + "  ")
+
     walk(vfs.root, "")
     return lines
 
@@ -190,6 +190,68 @@ def _write_bytes(data: bytes):
     sys.stdout.flush()
     sys.stdout.buffer.write(data)
     sys.stdout.buffer.flush()
+
+def _parent_of(canon: str):
+    comps = canon.split("/")[1:]
+    if not comps:
+        return "/"
+    return "/" + "/".join(comps[:-1])
+
+def _mkdir_single(vfs: VFS, canon: str, log):
+    if canon in vfs._index:
+        return "File exists"
+    parent_canon = _parent_of(canon)
+    parent = vfs._index.get(parent_canon)
+    if parent is None:
+        return "No such file or directory"
+    if not parent.is_dir:
+        return "Not a directory"
+    name = canon.rsplit("/", 1)[1]
+    node = VFSNode(name, True)
+    parent.children[name] = node
+    vfs._index[canon] = node
+    if log:
+        log(canon)
+    return None
+
+def _ensure_dir_chain(vfs: VFS, canon: str, log):
+    comps = canon.split("/")[1:]
+    node = vfs.root
+    for i, c in enumerate(comps):
+        built = "/" + "/".join(comps[: i + 1])
+        last = (i == len(comps) - 1)
+        child = node.children.get(c)
+        if child is None:
+            new = VFSNode(c, True)
+            node.children[c] = new
+            vfs._index[built] = new
+            if log:
+                log(built)
+            node = new
+        elif child.is_dir:
+            node = child
+        else:
+            return "Not a directory" if not last else "File exists"
+    return None
+
+def _touch_single(vfs: VFS, canon: str):
+    node = vfs._index.get(canon)
+    if node is not None:
+        if node.is_dir:
+            return "Is a directory"
+        return None  # существующий файл: время не храним -> тихий успех
+    parent_canon = _parent_of(canon)
+    parent = vfs._index.get(parent_canon)
+    if parent is None:
+        return "No such file or directory"
+    if not parent.is_dir:
+        return "Not a directory"
+    name = canon.rsplit("/", 1)[1]
+    f = VFSNode(name, False)
+    f.data = b""
+    parent.children[name] = f
+    vfs._index[canon] = f
+    return None
 
 def _parse_ls_flags(args: list):
     show_all = False
@@ -218,6 +280,48 @@ def _parse_ls_flags(args: list):
             return (False, False, [], "ls: invalid option -- '-'")
         paths.append(tok)
     return (show_all, long_fmt, paths, None)
+
+def _parse_mkdir_flags(args: list):
+    parents = False
+    verbose = False
+    paths = []
+    seen_dd = False
+    for tok in args:
+        if seen_dd:
+            paths.append(tok)
+            continue
+        if tok == "--":
+            seen_dd = True
+            continue
+        if len(tok) > 1 and tok[0] == "-" and tok[1] == "-":
+            return (False, False, [], f"mkdir: unrecognized option '{tok}'")
+        if len(tok) > 1 and tok[0] == "-":
+            for ch in tok[1:]:
+                if ch == "p":
+                    parents = True
+                elif ch == "v":
+                    verbose = True
+                else:
+                    return (False, False, [], f"mkdir: invalid option -- '{ch}'")
+            continue
+        paths.append(tok)
+    return (parents, verbose, paths, None)
+
+
+def _parse_touch_paths(args: list):
+    paths = []
+    seen_dd = False
+    for tok in args:
+        if seen_dd:
+            paths.append(tok)
+            continue
+        if tok == "--":
+            seen_dd = True
+            continue
+        if len(tok) > 1 and tok[0] == "-":
+            return ([], f"touch: invalid option -- '{tok[1]}'")
+        paths.append(tok)
+    return (paths, None)
 
 def _ls_long_line(node: VFSNode):
     if node.is_dir:
@@ -277,8 +381,7 @@ def cmd_cd(args: list):
 
 def cmd_cat(args: list):
     if not args:
-        print("cat: missing operand; reading from stdin is not supported here",
-              file=sys.stderr)
+        print("cat: missing operand; reading from stdin is not supported here", file=sys.stderr)
         return
     for p in args:
         ap = _abs(p)
@@ -293,6 +396,38 @@ def cmd_cat(args: list):
 
 def cmd_pwd(args: list):
     print(STATE.cwd)
+
+def cmd_mkdir(args: list):
+    parents, verbose, paths, err = _parse_mkdir_flags(args)
+    if err:
+        print(err, file=sys.stderr)
+        return
+    if not paths:
+        print("mkdir: missing operand", file=sys.stderr)
+        return
+    vfs = STATE.vfs
+    log = (lambda canon: print(f"mkdir: created directory '{canon}'")) if verbose else None
+    for p in paths:
+        canon = _abs(p)
+        e = _ensure_dir_chain(vfs, canon, log) if parents else _mkdir_single(vfs, canon, log)
+        if e is not None:
+            print(f"mkdir: cannot create directory '{p}': {e}", file=sys.stderr)
+
+
+def cmd_touch(args: list):
+    paths, err = _parse_touch_paths(args)
+    if err:
+        print(err, file=sys.stderr)
+        return
+    if not paths:
+        print("touch: missing file operand", file=sys.stderr)
+        return
+    vfs = STATE.vfs
+    for p in paths:
+        canon = _abs(p)
+        e = _touch_single(vfs, canon)
+        if e is not None:
+            print(f"touch: cannot touch '{p}': {e}", file=sys.stderr)
 
 def cmd_exit(args: list):
     print("exit: Goodbye!")
@@ -314,6 +449,8 @@ COMMANDS = {
     "cd": cmd_cd,
     "cat": cmd_cat,
     "pwd": cmd_pwd,
+    "mkdir": cmd_mkdir,
+    "touch": cmd_touch,
     "exit": cmd_exit,
     "vfs-init": cmd_vfs_init
 }
@@ -407,9 +544,7 @@ def repl():
 def main():
     args = build_arg_parser().parse_args()
     cfg = {"vfs_path": args.vfs_path, "script_path": args.script_path}
-
     debug_print_config(cfg)
-
     if cfg["vfs_path"]:
         if not os.path.isfile(cfg["vfs_path"]):
             print(f"Error: VFS file not found: {cfg['vfs_path']}", file=sys.stderr)
@@ -419,9 +554,7 @@ def main():
     else:
         STATE.vfs = default_vfs()
         STATE.vfs_source = None
-
     debug_print_vfs(STATE)
-
     if cfg["script_path"]:
         run_script(cfg["script_path"])
     else:

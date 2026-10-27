@@ -1,0 +1,37 @@
+pwd
+mkdir /newdir
+ls
+mkdir /newdir/sub1 /newdir/sub2
+ls /newdir
+mkdir -p /deep/a/b/c
+ls /deep
+ls -l /deep/a
+mkdir -v /verbose_dir
+mkdir /newdir
+mkdir /nope/child
+mkdir /etc/motd/inside
+mkdir --bogus
+mkdir
+mkdir -- -dashdir
+ls
+touch /newdir/file1.txt
+touch /newdir/file1.txt
+cat /newdir/file1.txt
+ls -l /newdir
+touch /newdir/sub1
+touch /nope/x
+touch /etc/motd/inside
+touch --bogus
+touch
+touch -- -dashfile
+ls
+cd /newdir
+pwd
+touch local.txt
+ls -l
+cat local.txt
+cd /
+vfs-init
+ls
+ls /newdir
+exit
