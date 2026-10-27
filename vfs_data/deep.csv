@@ -1,0 +1,13 @@
+type,path,content
+dir,/
+dir,/home
+dir,/home/alice
+dir,/home/alice/projects
+dir,/home/alice/projects/src
+file,/home/alice/projects/src/main.c,d29ybGQ=
+file,/home/alice/projects/notes.txt,aGVsbG8=
+file,/home/alice/projects/blob.bin,Zm9vYmFy
+dir,/etc
+file,/etc/hosts,
+dir,/var
+dir,/var/log

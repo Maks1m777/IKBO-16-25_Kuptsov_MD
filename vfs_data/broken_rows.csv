@@ -1,0 +1,7 @@
+type,path,content
+dir,/
+file,/good.txt,aGVsbG8=
+file,/bad_b64.txt,!!!notbase64!!!
+link,/symlink,
+dir,/good.txt/child
+file,/good.txt,dupe

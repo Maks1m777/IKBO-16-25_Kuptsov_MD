@@ -1,0 +1,7 @@
+type,path,content
+dir,/
+file,/readme.txt,aGVsbG8=
+file,/license,Zm9v
+dir,/docs
+file,/docs/intro.txt,d29ybGQ=
+file,/docs/empty,

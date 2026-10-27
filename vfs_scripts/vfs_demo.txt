@@ -1,0 +1,6 @@
+ls
+cd /home
+vfs-init
+vfs-init extra_arg
+foobar
+exit

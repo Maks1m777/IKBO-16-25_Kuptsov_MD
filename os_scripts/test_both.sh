@@ -1,8 +1,8 @@
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 EMULATOR="$ROOT/vfs_emulator.py"
 
-echo ">>> [test_both] --vfs + --script (with_errors.txt)"
+echo ">>> [test_both] --vfs several_files.csv + --script basic.txt"
 python3 "$EMULATOR" \
-    --vfs /data/vfs.img \
-    --script "$ROOT/vfs_scripts/with_errors.txt"
+    --vfs "$ROOT/vfs_data/several_files.csv" \
+    --script "$ROOT/vfs_scripts/basic.txt"
 echo ">>> exit code: $?"
