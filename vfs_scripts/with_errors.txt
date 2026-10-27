@@ -1,0 +1,6 @@
+ls
+
+foobar --bad
+cd /tmp
+unknown
+exit
